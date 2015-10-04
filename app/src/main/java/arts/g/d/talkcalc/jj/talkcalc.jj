@@ -1,0 +1,748 @@
+// http://read.pudn.com/downloads197/sourcecode/compiler/927244/%E7%A8%8B%E5%BA%8F%E6%BA%90%E7%A0%81%E5%8F%8A%E7%94%9F%E6%88%90%E7%9A%84java%E5%92%8Cclass%E6%96%87%E4%BB%B6/calculator.jj__.htm
+
+options { 
+  STATIC = false; 
+  UNICODE_INPUT = true;
+} 
+PARSER_BEGIN(calculator)
+package arts.g.d.talkcalc.jj;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
+
+import java.io.PrintStream ; 
+public class calculator {
+	public class DLValue {
+		double floatValue;
+		long   intValue;
+		boolean bIsFloat;
+		boolean bIsDate;
+		boolean bIsError;
+		boolean bIsBitOverflow;
+		String errorString;
+
+		public DLValue()
+		{
+			init();
+		}
+		
+		public DLValue(long value)
+		{
+			set(value);
+		}
+
+		public DLValue(int value)
+		{
+			set(value);
+		}
+
+		public DLValue(float value)
+		{
+			set(value);
+		}
+
+		public DLValue(double value)
+		{
+			set(value);
+		}
+		
+		public void init()
+		{
+			floatValue = 0.0;
+			intValue = 0;
+			bIsFloat = true;
+			bIsDate = false;
+			bIsError = false;
+			errorString = "";
+			bIsBitOverflow = false;
+		}
+		
+		public void setLong(boolean value)
+		{
+			bIsFloat = value;
+		}
+		public void set(long value)
+		{
+			intValue = value;
+			bIsFloat = false;
+		}
+		public void set(int value)
+		{
+			intValue = (long)value;
+			bIsFloat = false;
+		}
+
+		public void set(float value)
+		{
+			floatValue = (double)value;
+			bIsFloat = true;
+		}
+
+		public void set(double value)
+		{
+			floatValue = value;
+			bIsFloat = true;
+		}
+		public boolean getIsFloat()
+		{
+			return bIsFloat;
+		}
+		
+		public void sync()
+		{
+			if( !bIsFloat ){
+				floatValue = intValue;
+			}else{
+				intValue = (long)floatValue;
+			}
+		}
+		
+		public void upSync()
+		{
+			sync();
+			if( !bIsFloat ){
+				bIsFloat = true;
+				bIsDate = false;
+			}
+		}
+		public void up()
+		{
+			bIsDate = false;
+			bIsFloat = true;
+		}
+		public void down()
+		{
+			bIsFloat = false;
+		}
+		public double getFloatValue()
+		{
+			return floatValue;
+		}
+		
+		public long getIntValue()
+		{
+			return intValue;
+		}
+		
+		public void print()
+		{
+			if( bIsError ){
+				System.out.println("Error:"+errorString);
+				return;
+			}
+			if( bIsBitOverflow ){
+				System.out.println("Overflow:"+errorString);
+			}
+			if( bIsFloat ){
+				System.out.println(getFloatValue());
+			}else{
+				System.out.println(getIntValue());
+				if( bIsDate ){
+					SimpleDateFormat dateFormat = new  SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+					dateFormat.setTimeZone(TimeZone.getTimeZone( "GMT+0" ));
+					Date date = new Date(getIntValue());
+					String strDate = dateFormat.format(date);
+					System.out.println(strDate);
+				}
+			}
+		}
+		
+		public DLValue parse(String str)
+		{
+			long valuelong = 0;
+			double valuedouble = 0.0;
+			int radix = 10;
+			String newstr = str;
+			if(str.length() > 2 && str.charAt(0)=='0' && str.charAt(1)=='x' ){
+				newstr = str.substring(2,str.length());
+				radix = 16;
+				newstr = newstr.trim().replaceAll(" ", "");
+				newstr = newstr.replaceAll("\\p{Z}", "");
+			}else if(str.length()>1 && str.charAt(str.length()-1)=='b'){
+				// remove a last 'b' char 
+				newstr = str.substring(0,str.length()-1);
+				radix = 2;
+				newstr = newstr.trim().replaceAll(" ", "");
+				newstr = newstr.replaceAll("\\p{Z}", "");
+			}
+			if( radix == 10 ){
+				try{
+					valuelong = Long.parseLong(newstr, radix);
+					set(valuelong);
+					return new DLValue(valuelong);
+				}catch(NumberFormatException nfe){
+					try{
+						valuedouble = Double.parseDouble(newstr);
+					}catch(NumberFormatException nfe2){
+						errorString = "NumberFormatException";
+						bIsError = true;
+						return new DLValue(0);
+					}
+					set(valuedouble);
+					return new DLValue(valuedouble);
+				}
+			}else{
+				try{
+					valuelong = Long.parseLong(newstr, radix);
+				}catch(NumberFormatException nfe2){
+					errorString = "NumberFormatException";
+					bIsError = true;
+					return new DLValue(0);
+				}
+				set(valuelong);
+				return new DLValue(valuelong);
+			}
+		}
+		
+		public DLValue function(String type, String input1, String input2)
+		{
+			if("date".equals(type)){
+				SimpleDateFormat dateFormat = new  SimpleDateFormat(input1, java.util.Locale.getDefault());
+				dateFormat.setTimeZone(TimeZone.getTimeZone( "GMT+0" ));
+				Date date;
+				try {
+					date = dateFormat.parse(input2);
+				} catch (Exception e) {
+					errorString = "date function Error";
+					bIsError = true;
+					return this;
+				}
+				set(date.getTime());
+				bIsDate = true;
+			}
+			return this;
+		}
+		public long getFactorial(long number) {
+			long factorial = 1;
+			for (long i = 1; i <= number; ++i) {
+				factorial *= i;
+			}
+			return factorial;
+		}
+		public DLValue function(String type)
+		{
+			if("PI".equals(type)){
+				up();
+				floatValue = Math.PI;
+			}else if("E".equals(type)){
+				up();
+				floatValue = Math.E;
+			}else if("~".equals(type)){
+				if( bIsFloat ){
+					errorString = "overflow";
+					bIsError = true;
+					return this;
+				}
+				intValue = ~intValue; 
+			}else if("!".equals(type)){
+				if( bIsFloat || (intValue > 20)){
+					errorString = "overflow";
+					bIsError = true;
+					return this;
+				}
+				intValue = getFactorial(intValue); 
+			}
+			return this;
+		}
+
+		public DLValue function(String type, DLValue input1, DLValue input2)
+		{
+			sync();
+			input1.sync();
+			input2.sync();
+			if("pow".equals(type)){
+				up();
+				input1.up();
+				input2.up();
+				floatValue = Math.pow(input1.getFloatValue(),input2.getFloatValue());
+			}else if("atan2".equals(type)){
+				up();
+				input1.up();
+				input2.up();
+				floatValue = Math.atan2( input1.getFloatValue(),input2.getFloatValue());
+			}else if("max".equals(type)){
+				floatValue = Math.max( input1.getFloatValue(),input2.getFloatValue());
+				intValue = Math.max( input1.getIntValue(),input2.getIntValue() );
+			}else if("min".equals(type)){
+				floatValue = Math.min( input1.getFloatValue(),input2.getFloatValue());
+				intValue = Math.min( input1.getIntValue(),input2.getIntValue() );
+			}else if("hypot".equals(type)){
+				up();
+				input1.up();
+				input2.up();
+				floatValue = Math.hypot( input1.getFloatValue(),input2.getFloatValue());
+			}
+			
+			if( !bIsFloat )
+			{
+				// Integer
+				if( floatValue - intValue > 1.0E-16 ) {
+					// If difference is greater than 1d, must change type to the float
+					up();
+				}
+			}
+			return this;
+		}
+		
+		public DLValue function(String type, DLValue input1)
+		{
+			boolean isFloat = bIsFloat | input1.getIsFloat();
+			boolean onlyInt = false;
+			sync();
+			input1.sync();
+			
+			if( isFloat ) {
+				upSync();
+				input1.upSync();
+			}
+			
+			if("+".equals(type)){
+				floatValue = floatValue + input1.getFloatValue();
+				intValue = intValue + input1.getIntValue();
+			}else if("-".equals(type)){
+				floatValue = floatValue - input1.getFloatValue();
+				intValue = intValue - input1.getIntValue();
+			}else if("*".equals(type)){
+				floatValue = floatValue * input1.getFloatValue();
+				intValue = intValue * input1.getIntValue();
+			}else if("/".equals(type)){
+				floatValue = floatValue / input1.getFloatValue();
+				intValue = intValue / input1.getIntValue();
+			}else if("sin".equals(type)){
+				up();
+				floatValue = Math.sin( input1.getFloatValue() );
+			}else if("cos".equals(type)){
+				up();
+				floatValue = Math.cos( input1.getFloatValue() );
+			}else if("tan".equals(type)){
+				up();
+				floatValue = Math.tan( input1.getFloatValue() );
+			}else if("asin".equals(type)){
+				up();
+				floatValue = Math.asin( input1.getFloatValue() );
+			}else if("acos".equals(type)){
+				up();
+				floatValue = Math.acos( input1.getFloatValue() );
+			}else if("atan".equals(type)){
+				up();
+				floatValue = Math.atan( input1.getFloatValue() );
+			}else if("toRadians".equals(type)){
+				up();
+				floatValue = Math.toRadians( input1.getFloatValue() );
+			}else if("toDegrees".equals(type)){
+				up();
+				floatValue = Math.toDegrees( input1.getFloatValue() );
+			}else if("exp".equals(type)){
+				up();
+				floatValue = Math.exp( input1.getFloatValue() );
+			}else if("log".equals(type)){
+				up();
+				floatValue = Math.log( input1.getFloatValue() );
+			}else if("log10".equals(type)){
+				up();
+				floatValue = Math.log10( input1.getFloatValue() );
+			}else if("sqrt".equals(type)){
+				up();
+				floatValue = Math.sqrt( input1.getFloatValue() );
+			}else if("cbrt".equals(type)){
+				up();
+				floatValue = Math.cbrt( input1.getFloatValue() );
+			}else if("ceil".equals(type)){
+				up();
+				floatValue = Math.ceil( input1.getFloatValue() );
+			}else if("floor".equals(type)){
+				up();
+				floatValue = Math.floor( input1.getFloatValue() );
+			}else if("rint".equals(type)){
+				up();
+				floatValue = Math.rint( input1.getFloatValue() );
+			}else if("abs".equals(type)){
+				floatValue = Math.abs( input1.getFloatValue() );
+				intValue = Math.abs( input1.getIntValue() );
+			}else if("signum".equals(type)){
+				up();
+				floatValue = Math.signum( input1.getFloatValue() );
+			}else if("sinh".equals(type)){
+				up();
+				floatValue = Math.sinh( input1.getFloatValue() );
+			}else if("cosh".equals(type)){
+				up();
+				floatValue = Math.cosh( input1.getFloatValue() );
+			}else if("tanh".equals(type)){
+				up();
+				floatValue = Math.tanh( input1.getFloatValue() );
+			}else if("|".equals(type)){
+				if( bIsFloat ){
+					errorString = "float type is not support";
+					bIsError = true;
+					return this;
+				}
+				intValue = intValue | input1.getIntValue();
+				onlyInt = true;
+			}else if("^".equals(type)){
+				if( bIsFloat ){
+					errorString = "float type is not support";
+					bIsError = true;
+					return this;
+				}
+				intValue = intValue ^ input1.getIntValue();
+				onlyInt = true;
+			}else if("&".equals(type)){
+				if( bIsFloat ){
+					errorString = "float type is not support";
+					bIsError = true;
+					return this;
+				}
+				intValue = intValue & input1.getIntValue();
+				onlyInt = true;
+			}else if(">>".equals(type)){
+				if( bIsFloat ){
+					errorString = "float type is not support";
+					bIsError = true;
+					return this;
+				}
+				intValue = intValue >> input1.getIntValue();
+				onlyInt = true;
+			}else if("<<".equals(type)){
+				if( bIsFloat ){
+					errorString = "float type is not support";
+					bIsError = true;
+					return this;
+				}
+				intValue = intValue << input1.getIntValue();
+				floatValue = floatValue * Math.pow( 2, input1.getIntValue());
+				if( floatValue - intValue > 1.0E-20 ) {
+					// If difference is greater than 1d, must change type to the float
+					bIsBitOverflow = true;
+					errorString = "<<";
+				}
+				onlyInt = true;
+			}else if("%".equals(type)){
+				if( bIsFloat ){
+					errorString = "float type is not support";
+					bIsError = true;
+					return this;
+				}
+				intValue = intValue % input1.getIntValue();
+				onlyInt = true;
+			}
+			
+			if( !isFloat && !onlyInt )
+			{
+				// Integer
+				if( floatValue - intValue > 1.0E-20 ) {
+					// If difference is greater than 1d, must change type to the float
+					up();
+				}
+			}
+			
+			return this;
+		}
+	}
+	
+
+	static DLValue previousValue,thisValue;
+	public static void main(String args[]) throws ParseException { 
+		calculator parser = new calculator(System.in);	   
+		while (true) { 
+			System.out.println("This is an advanced calculator based on the prior .jj embeded in eclipse"); 
+			System.out.print("Enter an expression like \"2.0+3.4 \" we support +,-,*,\\,(),sin(),cos(),and number with fraction:"); 
+			try { 
+				parser.Start(System.out); 
+			} catch (Exception e) {
+				System.out.println("NOK."); 
+				System.out.println(e.getMessage()); 
+				parser.ReInit(System.in); 
+			} catch (Error e) { 
+				System.out.println("Oops."); 
+				System.out.println(e.getMessage()); 
+				break; 
+			} 
+		} 
+	}
+
+	public static String calc(java.io.InputStream stream) {
+		String ret;
+		calculator parser = new calculator(stream);
+		try{
+			parser.Start(System.out);
+		} catch (Exception e) {
+			ret = "NOK\n" + e.getMessage();
+			return ret;
+		} catch (Error e) {
+			ret = "Ooops\n" + e.getMessage();
+			return ret;
+		}
+
+		if( previousValue.bIsError ){
+			ret = "Error:"+previousValue.errorString;
+			return ret;
+		}
+		if( previousValue.bIsBitOverflow ){
+			ret = "Overflow:"+previousValue.errorString;
+			return ret;
+		}
+		if( previousValue.bIsFloat ){
+			ret = ""+previousValue.getFloatValue();
+		}else{
+			ret = ""+previousValue.getIntValue();
+			if( previousValue.bIsDate ){
+				SimpleDateFormat dateFormat = new  SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+				dateFormat.setTimeZone(TimeZone.getTimeZone( "GMT+0" ));
+				Date date = new Date(previousValue.getIntValue());
+				String strDate = dateFormat.format(date);
+				ret += "\n";
+				ret += strDate;
+			}
+		}
+		return ret;
+	}
+} 
+/*
+ ORDER
+ () , function, ~, +, - : Primary
+ * / % : 승제 term
+ + - : 가감 sum
+ << >> : shift bit
+ & : and bit
+ ^ : xor bit
+ | : or bit
+ */
+
+
+PARSER_END(calculator) 
+ 
+SKIP : 
+{ 
+	" " 
+}
+
+TOKEN : /* OPERATORS */ 
+{
+	< OR_BIT: "|" >
+|	< XOR_BIT: "^" >
+|	< AND_BIT: "&" >
+|	< RSHIFT_BIT: ">>" >
+|	< LSHIFT_BIT: "<<" >
+|	< PLUS: "+" > 
+|	< MINUS: "-" > 
+|	< MULTIPLY: "*" > 
+|	< DIVIDE: "/" >	  
+|	< MOD: "%" >
+|	< NOT: "~" >
+|	< LPAREN : "(">	   
+|	< RPAREN : ")">	   
+|	< INTEGER_NUMBER : <DIGITS> >	 
+|	< FLOATING_NUMBER : <DIGITS> "." <DIGITS> | <DIGITS> "." | "."<DIGITS> | <FLOATING_POINT> >	 
+|	< #DIGITS : (["0"-"9"])+ >	
+|	< SIN: "sin" | "SIN" >	  
+|	< COS: "cos" | "COS" >
+|	< TAN: "tan" | "TAN" >
+|	< ASIN: "asin" | "ASIN" >
+|	< ACOS: "acos" | "ACOS" >
+|	< ATAN: "atan" | "ATAN" >
+|	< TORADIANS: "toradians" | "TORADIANS" >
+|	< TODEGREES: "todegrees" | "TODEGREES" >
+|	< EXP: "exp" | "EXP" >
+|	< LOG: "log" | "LOG" >
+|	< LOG10: "log10" | "LOG10" >
+|	< SQRT: "sqrt" | "SQRT" >
+|	< CBRT: "cbrt" | "CBRT" >
+|	< CEIL: "ceil" | "CEIL" >
+|	< FLOOR: "floor" | "FLOOR" >
+|	< RINT: "rint" | "RINT" >
+|	< ABS: "abs" | "ABS" >
+|	< SIGNUM: "signum" | "SIGNUM" >
+|	< SINH: "sinh" | "SINH" >
+|	< COSH: "cosh" | "COSH" >
+|	< TANH: "tanh" | "TANH" >
+|	< POW: "pow" | "POW" >
+|	< ATAN2: "atan2" | "ATAN2" >
+|	< MAX: "max" | "MAX" >
+|	< MIN: "min" | "MIN" >
+|	< HYPOT: "hypot" | "HYPOT" >
+|	< PI: "pi" | "PI" >
+|	< MATH_E: "math_e" | "MATH_E" >
+|	< DATE: "date" | "DATE" >
+|	< FDATE: "fdate" | "FDATE" >
+|	< COMMA: "," >
+|	< HEX_NUMBER : "0x"(["0"-"9","A"-"F","a"-"f"," "])+ >
+|	< BIN_NUMBER : (["1","0"])+(["1","0"," "])*"b" >
+|	< STRING : 
+	  "\"" 
+	  (
+		 "\\" ~[]	  //any escaped character
+	  |				  //or
+		~["\"","\\"]  //any character except quote or backslash
+	  )* 
+	  "\"" >
+|	< #FLOATING_POINT : (["0"-"9"])+ "." (["0"-"9"])* (<EXPONENT>)? (["f","F","d","D"])?
+							  | "." (["0"-"9"])+ (<EXPONENT>)? (["f","F","d","D"])?
+							  | (["0"-"9"])+ <EXPONENT> (["f","F","d","D"])?
+							  | (["0"-"9"])+ (<EXPONENT>)? ["f","F","d","D"]
+	>
+|	< #EXPONENT: ["e","E"] (["+","-"])? (["0"-"9"])+ >
+|	< EOL : "\n" | "\r" | "\r\n" > 
+}
+
+
+
+void Start(PrintStream printStream)	 : 
+{} 
+{ 
+	( thisValue = or_bit() <EOL> { thisValue.print(); previousValue = thisValue; } )* <EOF>
+} 
+
+DLValue or_bit() :	
+{ 
+  DLValue i; 
+  DLValue value;
+  } 
+{ 
+	value=xor_bit() ( <OR_BIT>i=xor_bit(){value.function("|",i);} )* 
+	{return value;} 
+}
+
+DLValue xor_bit() :
+{ 
+  DLValue i; 
+  DLValue value;
+  } 
+{ 
+	value=and_bit() ( <XOR_BIT>i=and_bit(){value.function("^",i);} )* 
+	{return value;} 
+}
+
+DLValue and_bit() :
+{ 
+  DLValue i; 
+  DLValue value;
+  } 
+{ 
+	value=shift_bit() ( <AND_BIT>i=shift_bit(){value.function("&",i);} )* 
+	{return value;} 
+}
+
+DLValue shift_bit() :
+{ 
+  DLValue i; 
+  DLValue value;
+  } 
+{ 
+	value=sum() ( <RSHIFT_BIT>i=sum(){value.function(">>",i);} | <LSHIFT_BIT>i=sum(){value.function("<<",i);} )* 
+	{return value;} 
+}
+
+DLValue	 sum() :  
+{ 
+  DLValue i; 
+  DLValue value;
+  } 
+{ 
+	value=term() ( <PLUS>i=term(){value.function("+",i);} | <MINUS>i=term(){value.function("-",i); } )* 
+	{return value;} 
+} 
+
+
+DLValue term() :  
+{ 
+  DLValue i; 
+  DLValue value; 
+} 
+{ 
+	value = Primary()(<MULTIPLY>i = Primary(){ value.function("*",i); } | <DIVIDE>i = Primary(){ value.function("/",i); } | <MOD>i = Primary(){ value.function("%",i); })* 
+	{ return value ;} 
+}
+
+String string() :  
+{
+	Token t ; 
+}
+{
+	t=<STRING> { return new String(t.image); }
+}
+
+DLValue Primary() :	 
+{ 
+  Token t ; 
+  String a,b ;
+  DLValue value,value2;
+}
+{
+	t=<BIN_NUMBER> { return new DLValue().parse(t.image); }
+|
+	t=<HEX_NUMBER> { return new DLValue().parse(t.image); }
+|
+	t=<INTEGER_NUMBER> { return new DLValue().parse(t.image); }
+|
+	t=<FLOATING_NUMBER>{ return new DLValue(Double.parseDouble( t.image )) ; } 
+|
+	<PI>{ return new DLValue().function("PI"); }
+|
+	<MATH_E>{ return new DLValue().function("E"); }
+|
+	<LPAREN> value=or_bit() <RPAREN>{ return value ; } 
+|
+	<NOT> value=Primary() { return value.function("~"); } 
+|
+	<PLUS> value=Primary(){ return value; } 
+| 
+	<MINUS> value=Primary(){ return value.function("*",new DLValue(-1)) ; } 
+| 
+	<SIN><LPAREN>value=or_bit()<RPAREN>{ return value.function("sin",value); }	
+|	 
+	<COS><LPAREN>value=or_bit()<RPAREN>{ return value.function("cos",value); } 
+|
+	<TAN><LPAREN>value=or_bit()<RPAREN>{ return value.function("tan",value); } 
+|
+	<ASIN><LPAREN>value=or_bit()<RPAREN>{ return value.function("asin",value); } 
+|
+	<ACOS><LPAREN>value=or_bit()<RPAREN>{ return value.function("acos",value); } 
+|
+	<ATAN><LPAREN>value=or_bit()<RPAREN>{ return value.function("atan",value); }
+|
+	<TORADIANS><LPAREN>value=or_bit()<RPAREN>{ return value.function("toRadians",value); }
+|
+	<TODEGREES><LPAREN>value=or_bit()<RPAREN>{ return value.function("toDegrees",value); }
+|
+	<EXP><LPAREN>value=or_bit()<RPAREN>{ return value.function("exp",value); }
+|
+	<LOG><LPAREN>value=or_bit()<RPAREN>{ return value.function("log",value); }
+|
+	<LOG10><LPAREN>value=or_bit()<RPAREN>{ return value.function("log10",value); }
+|
+	<SQRT><LPAREN>value=or_bit()<RPAREN>{ return value.function("sqrt",value); }
+|
+	<CBRT><LPAREN>value=or_bit()<RPAREN>{ return value.function("cbrt",value); }
+|
+	<CEIL><LPAREN>value=or_bit()<RPAREN>{ return value.function("ceil",value); }
+|
+	<FLOOR><LPAREN>value=or_bit()<RPAREN>{ return value.function("floor",value); }
+|
+	<RINT><LPAREN>value=or_bit()<RPAREN>{ return value.function("rint",value); }
+|
+	<ABS><LPAREN>value=or_bit()<RPAREN>{ return value.function("abs",value); }
+|
+	<SIGNUM><LPAREN>value=or_bit()<RPAREN>{ return value.function("signum",value); }
+|
+	<SINH><LPAREN>value=or_bit()<RPAREN>{ return value.function("sinh",value); }
+|
+	<COSH><LPAREN>value=or_bit()<RPAREN>{ return value.function("cosh",value); }
+|
+	<TANH><LPAREN>value=or_bit()<RPAREN>{ return value.function("tanh",value); }
+|
+	<POW><LPAREN>value=or_bit()<COMMA>value2=or_bit()<RPAREN>{ return value.function("pow",value,value2); }
+|
+	<ATAN2><LPAREN>value=or_bit()<COMMA>value2=or_bit()<RPAREN>{ return value.function("atan2",value,value2); }
+|
+	<MAX><LPAREN>value=or_bit()<COMMA>value2=or_bit()<RPAREN>{ return value.function("max",value,value2); }
+|
+	<MIN><LPAREN>value=or_bit()<COMMA>value2=or_bit()<RPAREN>{ return value.function("min",value,value2); }
+|
+	<HYPOT><LPAREN>value=or_bit()<COMMA>value2=or_bit()<RPAREN>{ return value.function("hypot",value,value2); }
+|	 
+	<DATE><LPAREN>a=string()<RPAREN>{ return new DLValue().function("date", "\"yyyy-MM-dd HH:mm:ss\"", a); } 
+|
+	<FDATE><LPAREN>a=string()<COMMA>b=string()<RPAREN>{ return new DLValue().function("date", a, b); } 
+}
